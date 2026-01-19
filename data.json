@@ -1,0 +1,19 @@
+{
+  "customers": [
+    {
+      "id": "1761627578762",
+      "name": "jishan",
+      "phone": "1222"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "1761627593149",
+      "customerId": "1761627578762",
+      "amount": 50,
+      "type": "credit",
+      "note": "dinner",
+      "date": "2025-10-28T04:59:53.149Z"
+    }
+  ]
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khatabook Local</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app">
+        <header>
+            <h1>Khatabook </h1>
+        </header>
+
+        <main>
+            <section class="left">
+                <!-- Add Customer -->
+                <div class="card">
+                    <h2>Add Customer</h2>
+                    <form id="customerForm">
+                        <input name="name" placeholder="Customer name" required />
+                        <input name="phone" placeholder="Phone " />
+                        <button type="submit">Create</button>
+                    </form>
+                </div>
+
+                <!-- Customers List -->
+                <div class="card">
+                    <h2>Customers</h2>
+                    <ul id="customersList" class="list"></ul>
+                </div>
+            </section>
+
+            <section class="right">
+                <!-- Add Transaction -->
+                <div class="card">
+                    <h2>Add Transaction</h2>
+                    <form id="txForm">
+                        <select name="customerId" id="customerSelect" required></select>
+                        <input name="amount" type="number" step="0.01" placeholder="Amount" required />
+                        <select name="type" required>
+                            <option value="credit">Credit (received)</option>
+                            <option value="debit">Debit (given)</option>
+                        </select>
+                        <input name="note" placeholder="Note " />
+                        <button type="submit">Add Transaction</button>
+                    </form>
+                </div>
+
+                <!-- Ledger -->
+                <div class="card">
+                    <h2>Ledger</h2>
+                    <div id="ledgerContainer">
+                        <p>Select a customer to view ledger</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        const API_ROOT = "http://localhost:5000/api";
+
+        async function fetchJSON(url, opts = {}) {
+            const res = await fetch(url, opts);
+            return res.json();
+        }
+
+        // Load Customers Dropdown + List
+        async function loadCustomers() {
+            const data = await fetchJSON(`${API_ROOT}/customers`);
+            const list = document.getElementById("customersList");
+            const sel = document.getElementById("customerSelect");
+
+            list.innerHTML = "";
+            sel.innerHTML = "<option value=''>Select customer</option>";
+
+            data.customers.forEach(c => {
+                // List section
+                const li = document.createElement("li");
+                li.innerHTML = `
+                    <button class="link" data-id="${c.id}">${c.name}</button>
+                    <button class="deleteBtn" onclick="deleteCustomer('${c.id}')">Delete</button>
+                `;
+                list.appendChild(li);
+
+                // Dropdown section
+                const opt = document.createElement("option");
+                opt.value = c.id;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
+
+            document.querySelectorAll(".link").forEach(btn => {
+                btn.onclick = () => loadLedger(btn.dataset.id);
+            });
+        }
+
+        // Load Ledger Table
+        async function loadLedger(id) {
+            const data = await fetchJSON(`${API_ROOT}/ledger/${id}`);
+            const div = document.getElementById("ledgerContainer");
+
+            let html = `
+                <h3>${data.customer.name}</h3>
+                <p>Balance: ${data.balance.toFixed(2)}</p>
+                <table>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Note</th>
+                        <th>Action</th>
+                    </tr>
+            `;
+
+            data.transactions.forEach(t => {
+                const d = new Date(t.date);
+                html += `
+                    <tr>
+                        <td>${d.toLocaleDateString()}</td>
+                        <td>${d.toLocaleTimeString()}</td>
+                        <td>${t.type}</td>
+                        <td>${t.amount.toFixed(2)}</td>
+                        <td>${t.note || ""}</td>
+                        <td><button onclick="deleteTransaction('${t.id}')">Delete</button></td>
+                    </tr>
+                `;
+            });
+
+            html += `</table>`;
+            div.innerHTML = html;
+        }
+
+        // Add Customer
+        document.getElementById("customerForm").onsubmit = async e => {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            await fetchJSON(`${API_ROOT}/customers`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    name: f.get("name"),
+                    phone: f.get("phone")
+                })
+            });
+            e.target.reset();
+            loadCustomers();
+        };
+
+        // Add Transaction
+        document.getElementById("txForm").onsubmit = async e => {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            await fetchJSON(`${API_ROOT}/transaction`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    customerId: f.get("customerId"),
+                    amount: parseFloat(f.get("amount")),
+                    type: f.get("type"),
+                    note: f.get("note")
+                })
+            });
+            e.target.reset();
+            loadCustomers();
+        };
+
+        // Delete Customer
+        async function deleteCustomer(id) {
+            if (!confirm("Delete customer and all transactions?")) return;
+            await fetchJSON(`${API_ROOT}/customers/${id}`, {
+                method: "DELETE"
+            });
+            loadCustomers();
+            document.getElementById("ledgerContainer").innerHTML = "<p>Select a customer to view ledger</p>";
+        }
+
+        // Delete Transaction
+        async function deleteTransaction(id) {
+            if (!confirm("Delete this transaction?")) return;
+            await fetchJSON(`${API_ROOT}/transaction/${id}`, {
+                method: "DELETE"
+            });
+            loadCustomers();
+            document.getElementById("ledgerContainer").innerHTML = "<p>Transaction deleted. Select customer again.</p>";
+        }
+
+        window.onload = loadCustomers;
+    </script>
+
+</body>
+
+</html>
